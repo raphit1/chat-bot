@@ -1,5 +1,8 @@
-const { Client, GatewayIntentBits } = require('discord.js');
-const axios = require('axios');
+import { Client, GatewayIntentBits } from 'discord.js';
+import axios from 'axios';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const CHANNEL_ID = '1381359227561574420';
 
@@ -29,7 +32,7 @@ client.on('messageCreate', async (message) => {
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
-        }
+        },
       }
     );
 
