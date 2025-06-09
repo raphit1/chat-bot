@@ -14,6 +14,45 @@ const client = new Client({
   ],
 });
 
+const blagues = [
+  "Pourquoi les plongeurs plongent-ils toujours en arrière et jamais en avant ? Parce que sinon ils tombent dans le bateau. 😂",
+  "Pourquoi les oiseaux ne tweetent plus ? Parce qu'ils sont sur X. 🐦",
+  "J’ai demandé à mon ordi de m’écrire une blague… il a crashé. 🤖",
+  "Quel est le comble pour un électricien ? De ne pas être au courant. ⚡",
+  "Pourquoi les maths sont tristes ? Parce qu’elles ont trop de problèmes. ➗",
+  "Pourquoi les fantômes aiment-ils les ascenseurs ? Parce que ça les soulève. 👻",
+  "Que dit un zéro à un huit ? Sympa ta ceinture ! 😂",
+  "Pourquoi les squelettes ne se battent jamais entre eux ? Parce qu’ils n’ont pas le cran. 💀",
+  "Pourquoi est-ce que les pommes ne parlent jamais ? Parce qu’elles sont timides. 🍎",
+  "Pourquoi les chaussettes se perdent-elles toujours ? Parce qu’elles ont des trous de mémoire. 🧦"
+];
+
+const conseils = [
+  "Bois de l’eau régulièrement 💧",
+  "Prends des pauses pour ton cerveau 🧠",
+  "Note tes idées avant de les oublier ✍️",
+  "Fais un peu de sport chaque jour pour te sentir mieux 🏃‍♂️",
+  "Mange équilibré, ça aide ton moral 🍎🥦",
+  "Essaie la méditation ou la respiration profonde 🧘‍♀️",
+  "Fais-toi plaisir avec un bon livre ou une série 📚📺",
+  "Ne te compare pas aux autres, chacun avance à son rythme 🚶‍♂️",
+  "Sois gentil avec toi-même, personne n’est parfait 😊",
+  "Rappelle-toi de sourire, ça change tout ! 😄"
+];
+
+const imagesAleatoires = [
+  "un dragon volant au-dessus d'une montagne enneigée",
+  "un chat astronaute dans l'espace",
+  "une forêt enchantée avec des lucioles",
+  "un robot qui peint un tableau",
+  "un paysage cyberpunk de nuit",
+  "une plage tropicale au coucher du soleil",
+  "un samouraï dans un jardin japonais",
+  "une ville futuriste avec des voitures volantes",
+  "un portrait style art déco d'une femme élégante",
+  "un phare sur une falaise battue par les vagues"
+];
+
 client.once('ready', () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
 });
@@ -21,12 +60,113 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.channel.id !== CHANNEL_ID || message.author.bot) return;
 
+  const content = message.content.trim();
+
   try {
+    if (content === '!blague') {
+      const random = blagues[Math.floor(Math.random() * blagues.length)];
+      return message.channel.send(`😂 ${random}`);
+    }
+
+    if (content === '!conseil') {
+      const random = conseils[Math.floor(Math.random() * conseils.length)];
+      return message.channel.send(`💡 ${random}`);
+    }
+
+    if (content === '!imagealeatoire') {
+      const prompt = imagesAleatoires[Math.floor(Math.random() * imagesAleatoires.length)];
+      const imageRes = await axios.post(
+        'https://api.openai.com/v1/images/generations',
+        {
+          prompt,
+          n: 1,
+          size: '512x512',
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const imageUrl = imageRes.data.data[0].url;
+      return message.channel.send(`🖼️ Image aléatoire : ${prompt}\n${imageUrl}`);
+    }
+
+    if (content.startsWith('!image')) {
+      const prompt = content.slice(6).trim();
+      if (!prompt) return message.channel.send('🖼️ Utilise : `!image description`');
+
+      const imageRes = await axios.post(
+        'https://api.openai.com/v1/images/generations',
+        {
+          prompt,
+          n: 1,
+          size: '512x512',
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const imageUrl = imageRes.data.data[0].url;
+      return message.channel.send(`🖼️ Voici ton image : ${imageUrl}`);
+    }
+
+    if (content.startsWith('!anonyme')) {
+      const prompt = content.slice(8).trim();
+      if (!prompt) return message.channel.send('✉️ Utilise : `!anonyme ton message`');
+
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const reply = response.data.choices[0].message.content;
+      return message.channel.send(`📢 **Message anonyme :**\n${reply}`);
+    }
+
+    if (content.startsWith('!gpt')) {
+      const prompt = content.slice(4).trim();
+      if (!prompt) return message.channel.send('💬 Utilise : `!gpt ta question ici`');
+
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const reply = response.data.choices[0].message.content;
+      return message.channel.send(`🧠 ${reply}`);
+    }
+
+    // Par défaut : chat normal (sans !)
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: message.content }],
+        messages: [{ role: 'user', content }],
       },
       {
         headers: {
