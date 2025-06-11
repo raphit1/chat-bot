@@ -6,6 +6,7 @@ dotenv.config();
 
 const CHANNEL_GPT_ID = '1381359227561574420'; // salon GPT normal
 const CHANNEL_WTF_ID = '1382395197589029005'; // salon WTF
+const CHANNEL_HOT_ID = '1382418373010526238'; // salon hot
 
 const client = new Client({
   intents: [
@@ -163,6 +164,32 @@ Sois très percutant. Réponds uniquement par la phrase que tu veux envoyer.`;
       return message.channel.send(reply);
     } catch (err) {
       console.error('❌ Erreur GPT dans WTF:', err);
+    }
+  }
+
+  // === CHANNEL HOT ===
+  if (message.channel.id === CHANNEL_HOT_ID) {
+    try {
+      const prompt = `Tu es un chatbot sexy, provocant, flirty, style dragueur +18. Réponds au message suivant de façon très charmeuse, explicite mais jamais vulgaire ni interdit. Voici le message :\n"${content}"`;
+
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const reply = response.data.choices[0].message.content;
+      return message.channel.send(reply);
+    } catch (err) {
+      console.error('❌ Erreur GPT dans HOT:', err);
     }
   }
 
