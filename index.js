@@ -33,7 +33,6 @@ client.once('ready', () => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
-
   const content = message.content.trim();
 
   // === COMMANDES DU CHANNEL WTF ===
@@ -48,32 +47,19 @@ client.on('messageCreate', async (message) => {
       return message.channel.send(`💡 ${random}`);
     }
 
-    if (content === '!fusion') {
-      return message.channel.send('🧬 Fusion de deux trucs inutiles... Résultat : Twitter + ChatGPT = TwiGPT.');
-    }
-
-    if (content === '!fusionrandom') {
-      return message.channel.send('💥 Fusion aléatoire : Fromage + iPhone = iBrie.');
-    }
-
-    if (content === '!clash') {
-      return message.channel.send('💥 Toi t\'es le genre de gars à chercher "404 not found" sur Google.');
-    }
-
-    if (content === '!troll') {
-      return message.channel.send('🧌 Arrête de parler, ton micro fait saigner mes circuits.');
-    }
-
-    if (content.startsWith('!anonyme')) {
+    if (content.startsWith('!fusion ')) {
       const prompt = content.slice(8).trim();
-      if (!prompt) return message.channel.send('✉️ Utilise : `!anonyme ton message`');
+      if (!prompt.includes('+')) return message.channel.send('❓ Utilise : `!fusion mot1 + mot2`');
 
       try {
         const response = await axios.post(
           'https://api.openai.com/v1/chat/completions',
           {
             model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
+            messages: [{
+              role: 'user',
+              content: `Fusionne les deux choses suivantes de façon créative et absurde : ${prompt}`,
+            }],
           },
           {
             headers: {
@@ -84,15 +70,47 @@ client.on('messageCreate', async (message) => {
         );
 
         const reply = response.data.choices[0].message.content;
-        return message.channel.send(`📢 **Message anonyme :**\n${reply}`);
+        return message.channel.send(reply);
       } catch (err) {
-        return message.channel.send('❌ Erreur OpenAI.');
+        return message.channel.send('❌ Erreur lors de la fusion.');
       }
     }
 
-    if (content.startsWith('!gpt')) {
-      const prompt = content.slice(4).trim();
-      if (!prompt) return message.channel.send('💬 Utilise : `!gpt ta question ici`');
+    if (content === '!fusionrandom') {
+      try {
+        const response = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          {
+            model: 'gpt-3.5-turbo',
+            messages: [{
+              role: 'user',
+              content: `Invente une fusion aléatoire totalement absurde entre deux choses imaginaires ou réelles.`,
+            }],
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        const reply = response.data.choices[0].message.content;
+        return message.channel.send(reply);
+      } catch (err) {
+        return message.channel.send('❌ Erreur de fusion aléatoire.');
+      }
+    }
+
+    if (content.startsWith('!clash')) {
+      const mention = message.mentions.users.first();
+      if (!mention) return message.channel.send('❗ Utilise : `!clash @pseudo`');
+
+      const messages = await message.channel.messages.fetch({ limit: 50 });
+      const userMessages = messages.filter(m => m.author.id === mention.id).map(m => m.content).slice(0, 5).join('\n');
+
+      const prompt = `Voici des messages d'un utilisateur sur un serveur Discord :\n${userMessages}\n
+Réponds avec un clash méchant, agressif, drôle et percutant comme si tu voulais humilier cette personne dans le salon. Utilise du sarcasme, de l'humour noir, sois tranchant. Ne sois pas gentil.`;
 
       try {
         const response = await axios.post(
@@ -110,16 +128,18 @@ client.on('messageCreate', async (message) => {
         );
 
         const reply = response.data.choices[0].message.content;
-        return message.channel.send(`🧠 ${reply}`);
+        return message.channel.send(reply);
       } catch (err) {
-        return message.channel.send('❌ Erreur OpenAI.');
+        return message.channel.send('❌ Impossible de clasher cette personne.');
       }
     }
 
     // === MESSAGE LIBRE → Analyse IA (clash / brainrot / neutre)
     try {
-      const prompt = `Tu es un bot Discord. Voici le message d'un utilisateur : "${content}"\n\nRéponds selon la tonalité suivante :
-- Si c'est agressif → réponds avec un clash bien agressif, drôle, humiliant, dark humour autorisé.
+      const prompt = `Tu es un bot Discord. Voici le message d'un utilisateur : "${content}"
+
+Réponds selon la tonalité suivante :
+- Si c'est agressif → clash bien agressif, drôle, humiliant, dark humour autorisé.
 - Si c'est absurde / bizarre / incohérent → réponds de façon débile, random, brainrot.
 - Si c'est neutre → réponds de manière idiote, stupide, sans logique.
 
