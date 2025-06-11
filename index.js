@@ -4,9 +4,8 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const CHANNEL_COMMANDES = '1381359227561574420';
-const CHANNEL_WTF = '1382395197589029005';
-const CHANNEL_DESSIN = '1381864670511501323';
+const CHANNEL_CHAT = '1381359227561574420'; // salon blagues/conseils/gpt
+const CHANNEL_WTF = '1382395197589029005'; // salon wtf (réponses IA selon ton)
 
 const client = new Client({
   intents: [
@@ -17,16 +16,77 @@ const client = new Client({
 });
 
 const blagues = [
-  "Pourquoi les plongeurs plongent-ils en arrière ? Parce que sinon ils tombent dans le bateau.",
-  "Pourquoi les oiseaux ne tweetent plus ? Parce qu'ils sont sur X.",
-  "Quel est le comble pour un électricien ? Ne pas être au courant.",
+  "Pourquoi les plongeurs plongent-ils toujours en arrière et jamais en avant ? Parce que sinon ils tombent dans le bateau. 😂",
+  "Pourquoi les oiseaux ne tweetent plus ? Parce qu'ils sont sur X. 🐦",
+  "J’ai demandé à mon ordi de m’écrire une blague… il a crashé. 🤖",
+  "Quel est le comble pour un électricien ? De ne pas être au courant. ⚡",
+  "Pourquoi les maths sont tristes ? Parce qu’elles ont trop de problèmes. ➗",
+  "Pourquoi les fantômes aiment-ils les ascenseurs ? Parce que ça les soulève. 👻",
+  "Que dit un zéro à un huit ? Sympa ta ceinture ! 😂",
+  "Pourquoi les squelettes ne se battent jamais entre eux ? Parce qu’ils n’ont pas le cran. 💀",
+  "Pourquoi est-ce que les pommes ne parlent jamais ? Parce qu’elles sont timides. 🍎",
+  "Pourquoi les chaussettes se perdent-elles toujours ? Parce qu’elles ont des trous de mémoire. 🧦"
 ];
 
 const conseils = [
   "Bois de l’eau régulièrement 💧",
-  "Fais une pause pour ton cerveau 🧠",
+  "Prends des pauses pour ton cerveau 🧠",
   "Note tes idées avant de les oublier ✍️",
+  "Fais un peu de sport chaque jour pour te sentir mieux 🏃‍♂️",
+  "Mange équilibré, ça aide ton moral 🍎🥦",
+  "Essaie la méditation ou la respiration profonde 🧘‍♀️",
+  "Fais-toi plaisir avec un bon livre ou une série 📚📺",
+  "Ne te compare pas aux autres, chacun avance à son rythme 🚶‍♂️",
+  "Sois gentil avec toi-même, personne n’est parfait 😊",
+  "Rappelle-toi de sourire, ça change tout ! 😄"
 ];
+
+// Fonction pour analyser le ton du message (simple heuristique)
+function detectTone(text) {
+  const lower = text.toLowerCase();
+
+  const aggressionKeywords = ['pute', 'connard', 'sale', 'merde', 'ferme ta gueule', 'nique ta mère', 'ta gueule', 'ferme là', 'pute'];
+  if (aggressionKeywords.some(w => lower.includes(w))) return 'aggressive';
+
+  const brainrotKeywords = ['lirili', 'tung tung tung', 'brrr', 'patapim', 'sahour', 'pata', 'rot', 'wouf', 'brr', 'bruh'];
+  if (brainrotKeywords.some(w => lower.includes(w))) return 'brainrot';
+
+  return 'neutral';
+}
+
+// Fonction pour générer la réponse ChatGPT selon le ton
+async function generateResponse(tone, userMessage) {
+  let systemPrompt = '';
+
+  if (tone === 'aggressive') {
+    systemPrompt = "Tu es un bot qui répond en clash très mordant, sarcastique, avec humour noir. Fait bien sentir que tu rends la monnaie de la pièce.";
+  } else if (tone === 'brainrot') {
+    systemPrompt = "Tu es un bot qui répond avec des phrases absurdes, bizarres, décalées, brain rot, style internet wtf, références à la culture internet.";
+  } else {
+    systemPrompt = "Tu es un bot qui répond de manière idiote, stupide, drôle, mais pas méchant. Un peu naif.";
+  }
+
+  const response = await axios.post(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      max_tokens: 150,
+      temperature: 0.9
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      }
+    }
+  );
+
+  return response.data.choices[0].message.content.trim();
+}
 
 client.once('ready', () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
@@ -37,99 +97,58 @@ client.on('messageCreate', async (message) => {
 
   const content = message.content.trim();
 
-  // --- COMMANDES (salon principal)
-  if (message.channel.id === CHANNEL_COMMANDES) {
-    if (content === '!blague') {
-      const random = blagues[Math.floor(Math.random() * blagues.length)];
-      return message.channel.send(`😂 ${random}`);
-    }
-
-    if (content === '!conseil') {
-      const random = conseils[Math.floor(Math.random() * conseils.length)];
-      return message.channel.send(`💡 ${random}`);
-    }
-
-    if (content.startsWith('!anonyme')) {
-      const prompt = content.slice(8).trim();
-      if (!prompt) return message.channel.send('✉️ Utilise : `!anonyme ton message`');
-      return sendToGPT(message, `Écris ce message de façon anonyme : ${prompt}`, true);
-    }
-
-    if (content.startsWith('!gpt')) {
-      const prompt = content.slice(4).trim();
-      if (!prompt) return message.channel.send('💬 Utilise : `!gpt ta question ici`');
-      return sendToGPT(message, prompt);
-    }
-  }
-
-  // --- SALON WTF - réaction automatique
-  if (message.channel.id === CHANNEL_WTF) {
-    const prompt = `Quel ton a ce message : "${content}" ?
-Réponds par : "agressif", "neutre", ou "absurde".
-Ensuite, écris une réponse dans le même ton :
-- Si agressif → clash court et drôle.
-- Si neutre → phrase idiote ou random.
-- Si absurde → brain rot délirant.
-
-Formate la réponse uniquement en une seule ligne.`;
-    return sendToGPT(message, prompt);
-  }
-
-  // --- SALON DESSIN - image → clash dans WTF
-  if (message.channel.id === CHANNEL_DESSIN && message.attachments.size > 0) {
-    const imageUrl = message.attachments.first().url;
-
-    const prompt = `Regarde cette image : ${imageUrl}
-Fais une description méchante, absurde ou moqueuse de façon marrante.
-Formule ça comme un clash court.`;
-    
+  // Commandes dans CHANNEL_CHAT classique
+  if (message.channel.id === CHANNEL_CHAT) {
     try {
-      const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      if (content === '!blague') {
+        const random = blagues[Math.floor(Math.random() * blagues.length)];
+        return message.channel.send(`😂 ${random}`);
+      }
 
-      const reply = response.data.choices[0].message.content;
-      const channelWtf = await client.channels.fetch(CHANNEL_WTF);
-      if (channelWtf) channelWtf.send(`🎨 Clash du dessin :\n${reply}`);
-    } catch (err) {
-      console.error('Erreur image/GPT :', err.response?.data || err.message);
+      if (content === '!conseil') {
+        const random = conseils[Math.floor(Math.random() * conseils.length)];
+        return message.channel.send(`💡 ${random}`);
+      }
+
+      if (content.startsWith('!anonyme')) {
+        const prompt = content.slice(8).trim();
+        if (!prompt) return message.channel.send('✉️ Utilise : `!anonyme ton message`');
+
+        const reply = await generateResponse('neutral', prompt);
+        return message.channel.send(`📢 **Message anonyme :**\n${reply}`);
+      }
+
+      if (content.startsWith('!gpt')) {
+        const prompt = content.slice(4).trim();
+        if (!prompt) return message.channel.send('💬 Utilise : `!gpt ta question ici`');
+
+        const reply = await generateResponse('neutral', prompt);
+        return message.channel.send(`🧠 ${reply}`);
+      }
+
+      // Par défaut, réponse normale ChatGPT neutre
+      const reply = await generateResponse('neutral', content);
+      return message.channel.send(reply);
+
+    } catch (error) {
+      console.error('Erreur OpenAI :', error.response?.data || error.message);
+      return message.channel.send('❌ Je n’ai pas réussi à répondre.');
+    }
+  }
+
+  // Réponses automatiques dans le salon WTF
+  if (message.channel.id === CHANNEL_WTF) {
+    if (content.startsWith('!')) return; // ignore commandes
+
+    try {
+      const tone = detectTone(content);
+      const reply = await generateResponse(tone, content);
+      return message.channel.send(reply);
+    } catch (error) {
+      console.error('Erreur OpenAI WTF :', error.response?.data || error.message);
+      return message.channel.send('❌ Pas réussi à répondre dans wtf.');
     }
   }
 });
-
-// --- Fonction envoi vers GPT
-async function sendToGPT(message, prompt, anonym = false) {
-  try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    const reply = response.data.choices[0].message.content;
-    message.channel.send(anonym ? `📢 **Message anonyme :**\n${reply}` : `🧠 ${reply}`);
-  } catch (error) {
-    console.error('Erreur GPT :', error.response?.data || error.message);
-    message.channel.send('❌ Je n’ai pas réussi à répondre.');
-  }
-}
 
 client.login(process.env.DISCORD_TOKEN);
