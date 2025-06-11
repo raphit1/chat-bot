@@ -40,19 +40,6 @@ const conseils = [
   "Rappelle-toi de sourire, ça change tout ! 😄"
 ];
 
-const imagesAleatoires = [
-  "un dragon volant au-dessus d'une montagne enneigée",
-  "un chat astronaute dans l'espace",
-  "une forêt enchantée avec des lucioles",
-  "un robot qui peint un tableau",
-  "un paysage cyberpunk de nuit",
-  "une plage tropicale au coucher du soleil",
-  "un samouraï dans un jardin japonais",
-  "une ville futuriste avec des voitures volantes",
-  "un portrait style art déco d'une femme élégante",
-  "un phare sur une falaise battue par les vagues"
-];
-
 client.once('ready', () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
 });
@@ -73,48 +60,8 @@ client.on('messageCreate', async (message) => {
       return message.channel.send(`💡 ${random}`);
     }
 
-    if (content === '!imagealeatoire') {
-      const prompt = imagesAleatoires[Math.floor(Math.random() * imagesAleatoires.length)];
-      const imageRes = await axios.post(
-        'https://api.openai.com/v1/images/generations',
-        {
-          prompt,
-          n: 1,
-          size: '512x512',
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const imageUrl = imageRes.data.data[0].url;
-      return message.channel.send(`🖼️ Image aléatoire : ${prompt}\n${imageUrl}`);
-    }
-
-    if (content.startsWith('!image')) {
-      const prompt = content.slice(6).trim();
-      if (!prompt) return message.channel.send('🖼️ Utilise : `!image description`');
-
-      const imageRes = await axios.post(
-        'https://api.openai.com/v1/images/generations',
-        {
-          prompt,
-          n: 1,
-          size: '512x512',
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const imageUrl = imageRes.data.data[0].url;
-      return message.channel.send(`🖼️ Voici ton image : ${imageUrl}`);
+    if (content.startsWith('!image') || content === '!imagealeatoire') {
+      return message.channel.send('🖼️ La génération d’images est désactivée pour le moment.');
     }
 
     if (content.startsWith('!anonyme')) {
