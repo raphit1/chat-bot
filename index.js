@@ -1,10 +1,13 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import fetch from 'node-fetch';
+import FormData from 'form-data';
 
 dotenv.config();
 
 const CHANNEL_ID = '1381359227561574420';
+const DESSIN_CHANNEL_ID = '1381864670511501323';
 const WTF_CHANNEL_ID = '1382395197589029005';
 
 const client = new Client({
@@ -48,75 +51,81 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
+  // === FONCTION DESSIN + CLASH ===
+  if (message.channel.id === DESSIN_CHANNEL_ID && message.attachments.size > 0) {
+    const attachment = message.attachments.first();
+    if (!attachment.contentType?.startsWith('image')) return;
+
+    try {
+      const imgResponse = await fetch(attachment.url);
+      const imgBuffer = await imgResponse.arrayBuffer();
+      const base64Image = Buffer.from(imgBuffer).toString('base64');
+
+      const visionResponse = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4-vision-preview',
+          messages: [
+            {
+              role: 'system',
+              content: "Tu es un comique qui clashe très violemment les dessins. Rends chaque clash drôle, percutant, absurde ou humiliant (sans insulte grave).",
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: "Clash ce dessin, vraiment fort." },
+                { type: 'image_url', image_url: { url: `data:image/png;base64,${base64Image}` } }
+              ],
+            }
+          ],
+          max_tokens: 300
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const clash = visionResponse.data.choices[0].message.content;
+      const wtfChannel = await client.channels.fetch(WTF_CHANNEL_ID);
+      wtfChannel.send(`🎯 **Clash automatique du dessin posté :**\n${clash}`);
+    } catch (error) {
+      console.error('Erreur GPT-4 Vision :', error.response?.data || error.message);
+    }
+    return;
+  }
+
+  // === COMMANDES CLASSIQUES (blague, conseil, GPT) ===
+  if (message.channel.id !== CHANNEL_ID) return;
+
   const content = message.content.trim();
 
   try {
-    // Commandes dans le premier channel classique
-    if (message.channel.id === CHANNEL_ID) {
-      if (content === '!blague') {
-        const random = blagues[Math.floor(Math.random() * blagues.length)];
-        return message.channel.send(`😂 ${random}`);
-      }
+    if (content === '!blague') {
+      const random = blagues[Math.floor(Math.random() * blagues.length)];
+      return message.channel.send(`😂 ${random}`);
+    }
 
-      if (content === '!conseil') {
-        const random = conseils[Math.floor(Math.random() * conseils.length)];
-        return message.channel.send(`💡 ${random}`);
-      }
+    if (content === '!conseil') {
+      const random = conseils[Math.floor(Math.random() * conseils.length)];
+      return message.channel.send(`💡 ${random}`);
+    }
 
-      if (content.startsWith('!image') || content === '!imagealeatoire') {
-        return message.channel.send('🖼️ La génération d’images est désactivée pour le moment.');
-      }
+    if (content.startsWith('!image') || content === '!imagealeatoire') {
+      return message.channel.send('🖼️ La génération d’images est désactivée pour le moment.');
+    }
 
-      if (content.startsWith('!anonyme')) {
-        const prompt = content.slice(8).trim();
-        if (!prompt) return message.channel.send('✉️ Utilise : `!anonyme ton message`');
+    if (content.startsWith('!anonyme')) {
+      const prompt = content.slice(8).trim();
+      if (!prompt) return message.channel.send('✉️ Utilise : `!anonyme ton message`');
 
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const reply = response.data.choices[0].message.content;
-        return message.channel.send(`📢 **Message anonyme :**\n${reply}`);
-      }
-
-      if (content.startsWith('!gpt')) {
-        const prompt = content.slice(4).trim();
-        if (!prompt) return message.channel.send('💬 Utilise : `!gpt ta question ici`');
-
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const reply = response.data.choices[0].message.content;
-        return message.channel.send(`🧠 ${reply}`);
-      }
-
-      // Par défaut : chat normal (sans !)
       const response = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
           model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content }],
+          messages: [{ role: 'user', content: prompt }],
         },
         {
           headers: {
@@ -127,89 +136,48 @@ client.on('messageCreate', async (message) => {
       );
 
       const reply = response.data.choices[0].message.content;
-      return message.channel.send(reply);
+      return message.channel.send(`📢 **Message anonyme :**\n${reply}`);
     }
 
-    // Commandes dans le salon WTF_CHANNEL_ID
-    if (message.channel.id === WTF_CHANNEL_ID) {
-      // !fusion
-      if (content.toLowerCase().startsWith('!fusion')) {
-        const parts = content.slice(7).split('+').map(s => s.trim()).filter(Boolean);
-        if (parts.length !== 2) {
-          return message.channel.send('❌ Utilisation : `!fusion élément1 + élément2`');
+    if (content.startsWith('!gpt')) {
+      const prompt = content.slice(4).trim();
+      if (!prompt) return message.channel.send('💬 Utilise : `!gpt ta question ici`');
+
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [{ role: 'user', content: prompt }],
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
         }
+      );
 
-        const prompt = `Fusionne ces deux éléments en un personnage absurde, drôle, style mème Internet :\n- Élément 1 : ${parts[0]}\n- Élément 2 : ${parts[1]}\nDonne un nom à ce personnage et décris-le en 2 phrases maximum.`;
-
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const fusionReply = response.data.choices[0].message.content;
-        return message.channel.send(`🤖 **Fusion créée :**\n${fusionReply}`);
-      }
-
-      // !clash
-      if (content.toLowerCase().startsWith('!clash')) {
-        const target = content.slice(6).trim();
-        if (!target) return message.channel.send('❌ Utilisation : `!clash [nom de la cible]`');
-
-        const prompt = `Écris un clash drôle et léger à propos de : ${target}. Ce clash doit être humoristique, pas méchant, et adapté à Discord.`;
-
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const clashReply = response.data.choices[0].message.content;
-        return message.channel.send(`🔥 **Clash :**\n${clashReply}`);
-      }
-
-      // !troll
-      if (content.toLowerCase().startsWith('!troll')) {
-        const target = content.slice(6).trim();
-        if (!target) return message.channel.send('❌ Utilisation : `!troll [nom de la cible]`');
-
-        const prompt = `Écris un message troll amusant, léger et bon enfant à propos de : ${target}. Doit rester drôle et pas méchant, style mème Discord.`;
-
-        const response = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          {
-            model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        const trollReply = response.data.choices[0].message.content;
-        return message.channel.send(`🤣 **Troll :**\n${trollReply}`);
-      }
+      const reply = response.data.choices[0].message.content;
+      return message.channel.send(`🧠 ${reply}`);
     }
 
+    // Message par défaut traité par GPT
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content }],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const reply = response.data.choices[0].message.content;
+    message.channel.send(reply);
   } catch (error) {
     console.error('Erreur OpenAI :', error.response?.data || error.message);
     message.channel.send('❌ Je n’ai pas réussi à répondre.');
